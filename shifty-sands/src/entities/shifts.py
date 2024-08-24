@@ -1,22 +1,25 @@
 from src.entities.data_classes import Shift
 import jax.numpy as jnp
-from typing import Optional
+from typing import Optional, List
 
 
 class RequirementShift(Shift):
     def __init__(
         self,
-        id: str,
-        start_time: float,
-        duration: float,
-        skill: str,
+        shift: Shift,
         daily_intervals: int = 24,
         coverage: Optional[jnp.ndarray] = None,
+        lower_bounds: Optional[List[int]] = None,
     ):
-        super().__init__(id, start_time, duration, skill)
+        self.id = shift.id
+        self.skill = shift.skill
+        self.start_time = shift.start_time
         self.start_int = jnp.trunc(self.start_time * daily_intervals / 24)
-        self.duration = self.duration * daily_intervals / 24
+        self.duration = jnp.trunc(
+            shift.duration * daily_intervals / 24
+        )  # duration in intervals
         self.coverage = coverage
+        self.lower_bounds = lower_bounds
 
         if coverage is None:
             self.coverage = jnp.ones(self.duration)
@@ -26,6 +29,15 @@ class RequirementShift(Shift):
             raise ValueError("Coverage must have values between 0 and 1")
         else:
             self.coverage = coverage
+
+        if lower_bounds is None:
+            self.lower_bounds = [0]
+        elif jnp.min(lower_bounds) < 0:
+            raise ValueError(
+                "Lower bounds must be composed of ints greater or equal to 0"
+            )
+        else:
+            self.lower_bounds = lower_bounds
 
     def get_shift_coverage(
         self, day_idx: int, daily_intervals: int, max_days: int
@@ -41,4 +53,18 @@ class RequirementShift(Shift):
 
 
 class SchedulesShift(Shift):
-    pass
+    def __init__(self, shift: Shift, type: str = "work"):
+        self.id = shift.id
+        self.skill = shift.skill
+        self.start_time = shift.start_time
+        self.duration = shift.duration
+        if type in ("work", "pto", "off"):
+            self.type = type
+        else:
+            ValueError("Invalid shift type...")
+
+    def is_pto(self):
+        return self.type == "pto"
+
+    def is_off(self):
+        return self.type == "off"

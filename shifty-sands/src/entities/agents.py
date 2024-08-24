@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Optional
 import jax.numpy as jnp
-from src.entities.availability import AgentAvailability, DailyAvailability
 
 
 @dataclass
-class Constraints:
+class AgentConstraints:
     early_start: int = 0  # earliest daily start of shift [0-24]
     late_start: int = 24  # latest daily start of shift (excluding) [0-24]
     timezone_correction: int = 0  # hourly timezone correction (from UTC) [-12:+12]
@@ -26,22 +25,15 @@ class Constraints:
             raise ValueError("consistency_hours must be in interval [0-6]")
 
 
-@dataclass
-class Preferences:
-    pass
-
-
-class Agent:
+class SchedulesAgent:
     def __init__(
         self,
         id: str,
         skills: List[str],
-        constraints: Constraints,
-        # preferences: Preferences,
+        constraints: AgentConstraints,
         availability: Optional[AgentAvailability],
     ) -> None:
         self.id = id
         skills: List[str] = skills
         self.constarints = constraints
-        # self.preferences = {}
         self.availability = availability

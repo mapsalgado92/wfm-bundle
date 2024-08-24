@@ -9,22 +9,41 @@ class Shift:
     id: str  # unique id of the shift
     start_time: float  # between 0.0 and 24.0
     duration: float  # number of hours of shift duration
-    skill: str  # skill the shift provides coverage for
+    skill: str  # skill id shift provides coverage for
 
 
 @dataclass
 class Skill:
-    code: str  # unique code defining skill
+    id: str  # unique code defining skill
+    task: str
+    queue: str
 
 
 @dataclass
-class Team:
+class Queue:
+    id: str
+    name: str
+
+
+@dataclass
+class Task:
     id: str
 
 
 @dataclass
 class Agent:
-    employee_id: str
     email: str
-    team: str
-    skills: List[str]
+    queue: str
+    active: bool
+
+
+@dataclass
+class Pattern:
+    id: str
+    mon: bool
+    tue: bool
+    wed: bool
+    thu: bool
+    fri: bool
+    sat: bool
+    sun: bool

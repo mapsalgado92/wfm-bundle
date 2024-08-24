@@ -1,17 +1,17 @@
 import jax.numpy as jnp
 from jax import jit, grad, random
-from .params import GradientDescentParams, StochasticRoudningParams
-from typing import Callable, Tuple, Optional
+from .params import GradientDescentParams, StochasticRoundingParams
+from typing import Callable, Tuple
 
 
 def gradient_descent(
     initial_weights: jnp.ndarray,
     target: jnp.ndarray,
     params: GradientDescentParams,
-    error_func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    loss_func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     lower_bounded: bool = False,
 ) -> Tuple[jnp.ndarray, list]:
-    gradient_function = jit(grad(error_func))
+    gradient_function = jit(grad(loss_func))
     evolution = []
     weights = initial_weights.copy()
     for i in range(params.num_iterations):
@@ -24,7 +24,7 @@ def gradient_descent(
 
         if i % params.snapshot_length == 0:
 
-            error = error_func(weights, target)
+            error = loss_func(weights, target)
 
             evolution.append(
                 {
@@ -42,8 +42,8 @@ def gradient_descent(
 def stochastic_rounding(
     initial_weights: jnp.ndarray,
     target: jnp.ndarray,
-    params: StochasticRoudningParams,
-    error_func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    params: StochasticRoundingParams,
+    loss_func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     seed: int = 0,
 ) -> Tuple[jnp.ndarray, list]:
 
@@ -70,7 +70,7 @@ def stochastic_rounding(
                     jnp.floor(section_weights),
                 )
             )
-            new_round_error = error_func(rounded_weights, target)
+            new_round_error = loss_func(rounded_weights, target)
 
             if new_round_error < best_round_error:
                 best_round_error = new_round_error

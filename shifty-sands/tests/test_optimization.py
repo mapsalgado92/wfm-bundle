@@ -1,23 +1,23 @@
-from src.algorythms.optimization import (
+from src.algorithms.optimization import (
     gradient_descent,
     GradientDescentParams,
-    StochasticRoudningParams,
+    StochasticRoundingParams,
 )
 import jax.numpy as jnp
+import pytest
 
-from src.algorythms.params import Params
+from src.algorithms.params import Params
 
 
 def test_gradient_specific_params_initialization():
     gd_params = GradientDescentParams(num_iterations=100)
-    sr_params = StochasticRoudningParams(section_size=20)
+    sr_params = StochasticRoundingParams(section_size=20)
 
     assert gd_params.num_iterations == 100
     assert sr_params.section_size == 20
     assert all((isinstance(p, Params) for p in [gd_params, sr_params]))
 
-
-def test_gradient_descent_basic_outputs():
+    # def test_gradient_descent_basic_outputs():
     initial_weights = jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])
     target = jnp.array([5.0, 3.0, 2.0, 5.0, 6.0])
     error_func = lambda weights, target: jnp.sum(

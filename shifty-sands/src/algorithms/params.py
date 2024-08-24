@@ -27,7 +27,7 @@ class GradientDescentParams(Params):
             raise ValueError("num_iterations must be greater than 0")
 
 
-class StochasticRoudningParams(Params):
+class StochasticRoundingParams(Params):
     def __init__(
         self,
         section_size: int,
