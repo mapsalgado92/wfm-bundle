@@ -6,4 +6,4 @@ Change directory shifty-sands project folder:
 
 Run **env_setup** with python:
 
-<code> python env_setup.py </code>
+<code>python env_setup.py </code>
