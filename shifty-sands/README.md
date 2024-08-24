@@ -1,8 +1,8 @@
-Clone Repository. This repo may holds multiple independent projects.
+### Setup
 
-Change directory into your chosen project:
+Change directory shifty-sands project folder:
 
-<code>cd {project-name}</code>
+<code>cd shifty-sands</code>
 
 Run **env_setup** with python:
 
