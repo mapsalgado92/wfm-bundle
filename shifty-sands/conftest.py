@@ -1,5 +1,5 @@
 from copy import deepcopy
-from objects.object_fetcher import fetch_from_json
+from tests.objects.object_fetcher import fetch_from_json
 
 import pytest
 
@@ -33,7 +33,7 @@ class TestObjects:
 
 
 @pytest.fixture(scope="session")
-def test_objects():
+def test_objects() -> TestObjects:
     objects = TestObjects()
     objects.add_object("test_values", fetch_from_json("test_values"))
     return objects

@@ -4,7 +4,6 @@ from src.algorithms.optimization import (
     StochasticRoundingParams,
 )
 import jax.numpy as jnp
-import pytest
 
 from src.algorithms.params import Params
 

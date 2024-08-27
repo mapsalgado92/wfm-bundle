@@ -14,17 +14,27 @@ def gradient_descent(
     gradient_function = jit(grad(loss_func))
     evolution = []
     weights = initial_weights.copy()
+    decay_mult = 1  # TODO: parameterize decay multiplier
+    error = 0
     for i in range(params.num_iterations):
         gradient = gradient_function(weights, target)
 
         weights = jnp.maximum(
-            weights - params.learning_rate * gradient,
+            weights - params.learning_rate * decay_mult * gradient,
             initial_weights if lower_bounded else 0,
         )
 
         if i % params.snapshot_length == 0:
 
-            error = loss_func(weights, target)
+            new_error = loss_func(weights, target)
+            if (
+                error > 0 and new_error / error > 0.99999999999999999
+            ):  # TODO:parameterize error threshold
+                print("Stopping optimization, no furhter gains...")
+                break
+
+            error = new_error
+            decay_mult *= 0.85
 
             evolution.append(
                 {

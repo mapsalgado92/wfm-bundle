@@ -9,7 +9,7 @@ class Shift:
     id: str  # unique id of the shift
     start_time: float  # between 0.0 and 24.0
     duration: float  # number of hours of shift duration
-    skill: str  # skill id shift provides coverage for
+    task: str  # skill id shift provides coverage for
 
 
 @dataclass
