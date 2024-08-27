@@ -38,8 +38,8 @@ class SchedulesWeeklyPattern(WeeklyPattern):
         )
         self.shift_list = shift_list
         start_times = [shift.start_time for shift in shift_list]
-        self.earliest_start = min(start_times)
-        self.latest_start = max(start_times)
+        self.earliest_start: float = min(start_times)
+        self.latest_start: float = max(start_times)
 
     def get_shift_at(self, day: int):
         return self.shift_list[day]

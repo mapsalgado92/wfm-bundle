@@ -231,6 +231,7 @@ class SchedulesGenerator(Generator):
             - off_cov
             - available_cov
         )
+        shift_avail = availability.get_weekly_shifts(week)
 
         # LOOK AHEAD TODO: This logic misses cases where we have forced working shifts
         opening_next_week = None
@@ -257,6 +258,9 @@ class SchedulesGenerator(Generator):
             if not self._valid_agent_start_times(agent, pattern):
                 continue
 
+            if not self._valid_off_pattern(off_cov, shift_cov, pattern):
+                continue
+
             valid_poss.append(pattern)
 
         return None
@@ -277,8 +281,8 @@ class SchedulesGenerator(Generator):
             pattern.latest_start <= agent.constarints.late_start
         )
 
-    def _valid_shifts(
-        self, off_cov, shift_cov, pattern: SchedulesWeeklyPattern
+    def _valid_off_pattern(
+        self, off_cov: List[int], shift_cov: List[int], pattern: SchedulesWeeklyPattern
     ) -> bool:
         # Check off shifts
         if any(
@@ -300,6 +304,14 @@ class SchedulesGenerator(Generator):
 
         else:
             return True
+
+    def _valid_consistency(
+        self,
+        agent: SchedulesAgent,
+        shift_avail: List[SchedulesShift],
+        pattern: SchedulesWeeklyPattern,
+    ) -> bool:
+        return True
 
     def _validate_num_weeks(self, num_weeks: int) -> bool:
         return all([self.requirements.values.shape[1] >= num_weeks * 7])
