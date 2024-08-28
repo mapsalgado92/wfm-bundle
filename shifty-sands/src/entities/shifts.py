@@ -65,6 +65,9 @@ class SchedulesShift(Shift):
         else:
             ValueError("Invalid shift type...")
 
+    def is_work(self):
+        return self.type == "work"
+
     def is_pto(self):
         return self.type == "pto"
 
@@ -112,10 +115,20 @@ class SchedulesShift(Shift):
 
     @staticmethod
     def new_unavailable_shift(start_time: float, end_time: float) -> "SchedulesShift":
-        return SchedulesShift(
-            Shift(id="unavailable", start_time=0, duration=24.0, task="unavailable"),
-            "avail",
-        )
+        if start_time < 0.0 or end_time >= 24.0 or start_time >= end_time:
+            ValueError(
+                "Start time and end_time must be between 0 and 24, and end_time must be greater"
+            )
+        else:
+            return SchedulesShift(
+                Shift(
+                    id="unavailable",
+                    start_time=start_time,
+                    duration=end_time - start_time,
+                    task="unavailable",
+                ),
+                "avail",
+            )
 
 
 class WeeklyShiftSequence:
@@ -133,17 +146,25 @@ class WeeklyShiftSequence:
         return self.shifts[week * 7 : (week + 1) * 7]
 
     def get_weekly_shift_coverage(
-        self, week: int, shift_ids: Optional[List[str]] = None
+        self,
+        week: int,
+        shift_ids: Optional[List[str]] = None,
     ) -> List[bool]:
         """
-        Get a weekly list of bools. True when weekly shift id is in 'shift_ids'
+        Get a weekly list of bools. True when weekly shift id is in 'shift_ids', in an aggregated form.
         Weeks are index like, starting at 0 and ending in self.num_weeks
         """
         self.check_week(week)
-        return [
-            (s.id in shift_ids if shift_ids else True)
-            for s in self.get_weekly_shifts(week)
-        ]
+
+        def check_shift(shift: Optional[Shift]):
+            if shift == None:
+                return False
+            elif shift_ids != None:
+                return shift.id in shift_ids
+            else:
+                return True
+
+        return [check_shift(shift) for shift in self.get_weekly_shifts(week)]
 
     def set_weekly_shifts(self, shifts: List[Shift], week: int) -> None:
         self.check_week(week)

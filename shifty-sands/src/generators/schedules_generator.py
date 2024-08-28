@@ -12,6 +12,9 @@ import jax.numpy as jnp
 from typing import List, Tuple, Dict, Optional
 import random
 
+from functools import lru_cache
+import logging
+
 
 class SchedulesRequirement:
     shifts: Tuple[RequirementShift]
@@ -56,11 +59,16 @@ class Schedules:
             availability.shifts, availability.default_shift
         )
 
-    def get_shift_coverage(week, shift_id) -> jnp.ndarray:
-        return jnp.array(["..."])
+    def get_multi_shift_weekly_coverage(
+        self, week, shifts: Tuple[SchedulesShift], from_avail: bool = False
+    ) -> jnp.ndarray:
+        coverage = []
+        shift_sequence = self.scheduled_shifts if not from_avail else self.availability
 
-    def get_hourly_coverage(week, shift_id) -> jnp.ndarray:
-        return jnp.array(["..."])
+        for shift in shifts:
+            coverage.append(shift_sequence.get_weekly_shift_coverage(week, [shift.id]))
+
+        return jnp.array(coverage).astype(int)
 
 
 class SchedGeneratorParams(Params):
@@ -106,45 +114,64 @@ class SchedulesGenerator(Generator):
         possible_patterns = self._generate_possible_patterns()
         randomized_order = list(range(self.num_schedules))
         for week in range(num_weeks):
+            logging.info("Generating week %d", week)
             for pass_idx in range(self.params.passes):
+                logging.info("--Generating pass %d", pass_idx)
                 random.shuffle(randomized_order)  # actually randomize order
                 is_last_pass = pass_idx == self.params.passes - 1
                 for sched_idx in randomized_order:
-                    self._generate_weekly_schedules(week, sched_idx, possible_patterns)
+                    logging.info("----Generating schedules %d", sched_idx)
+                    valid_patterns = self._valid_weekly_possibilities(
+                        week, sched_idx, possible_patterns
+                    )
+                    # [self._calc_pattern_error(pattern) for pattern in valid_patterns]
+                    logging.info("--------valid patterns [%d]", len(valid_patterns))
+                    if is_last_pass:
+                        logging.info("---------------last pass -> update_agent_carry()")
+
         return self.schedules
 
-    def _generate_base_weekly_pattens(self) -> List[WeeklyPattern]:
-        return [
-            WeeklyPattern(id=f"p{idx}", pattern=p)
-            for idx, p in enumerate(
-                [
-                    [True, True, True, True, True, False, False],
-                    [True, True, True, True, False, False, True],
-                    [True, True, True, False, False, True, True],
-                    [True, True, False, False, True, True, True],
-                    [True, False, False, True, True, True, True],
-                    [False, False, True, True, True, True, True],
-                    [False, True, True, True, True, True, False],
-                    [True, False, True, True, True, True, False],
-                    [True, True, False, True, True, True, False],
-                    [True, True, True, False, True, True, False],
-                    [True, True, False, True, True, False, True],
-                    [True, False, True, True, True, False, True],
-                    [False, True, True, True, True, False, True],
-                    [False, True, True, True, False, True, True],
-                    [False, True, True, False, True, True, True],
-                    [True, False, True, True, False, True, True],
-                ]
-            )
-        ]
+    def _get_error_increment(
+        self, pattern: SchedulesWeeklyPattern
+    ) -> Tuple[SchedulesWeeklyPattern, float]:
+        return ("pattern", "error")
 
-    def _generate_schedules_shifts_from_reqs(self) -> List[SchedulesShift]:
-        return [
-            SchedulesShift.from_reqs_shift(req_shift, type="work")
-            for req_shift in self.requirements.shifts
-        ]
+    def _generate_base_weekly_pattens(self) -> Tuple[WeeklyPattern]:
+        return tuple(
+            [
+                WeeklyPattern(id=f"p{idx}", pattern=p)
+                for idx, p in enumerate(
+                    [
+                        [True, True, True, True, True, False, False],
+                        [True, True, True, True, False, False, True],
+                        [True, True, True, False, False, True, True],
+                        [True, True, False, False, True, True, True],
+                        [True, False, False, True, True, True, True],
+                        [False, False, True, True, True, True, True],
+                        [False, True, True, True, True, True, False],
+                        [True, False, True, True, True, True, False],
+                        [True, True, False, True, True, True, False],
+                        [True, True, True, False, True, True, False],
+                        [True, True, False, True, True, False, True],
+                        [True, False, True, True, True, False, True],
+                        [False, True, True, True, True, False, True],
+                        [False, True, True, True, False, True, True],
+                        [False, True, True, False, True, True, True],
+                        [True, False, True, True, False, True, True],
+                    ]
+                )
+            ]
+        )
 
-    def _generate_possible_patterns(self) -> List[SchedulesWeeklyPattern]:
+    def _generate_schedules_shifts_from_reqs(self) -> Tuple[SchedulesShift]:
+        return tuple(
+            [
+                SchedulesShift.from_reqs_shift(req_shift, type="work")
+                for req_shift in self.requirements.shifts
+            ]
+        )
+
+    def _generate_possible_patterns(self) -> Tuple[SchedulesWeeklyPattern]:
         off_shift = SchedulesShift.new_off_shift()
 
         blocks_gap = self.params.days_off_to_break_consistency
@@ -205,31 +232,28 @@ class SchedulesGenerator(Generator):
                                         shift_list=[*first_section, *second_section],
                                     )
                                 )
-        return possible_patterns
+        return tuple(possible_patterns)
 
-    #####################################------------------------
-
-    def _generate_weekly_schedules(
+    @lru_cache(maxsize=None)  # caching result to save computations
+    def _valid_weekly_possibilities(
         self,
         week: int,
         sched_idx: int,
-        possible_patterns: List[SchedulesWeeklyPattern],
-    ) -> None:
-
+        possible_patterns: Tuple[SchedulesWeeklyPattern],
+    ) -> Tuple[SchedulesWeeklyPattern]:
         availability = self.schedules[sched_idx].availability
-        scheduled_shifts = self.schedules[sched_idx].scheduled_shifts
         agent = self.schedules[sched_idx].agent
 
         off_cov = jnp.array(
             availability.get_weekly_shift_coverage(week, ["off"])
         ).astype(int)
-        available_cov = jnp.array(
-            availability.get_weekly_shift_coverage(week, ["available"])
+        avail_cov = jnp.array(
+            availability.get_weekly_shift_coverage(week, ["available", "unavaliable"])
         ).astype(int)
         shift_cov = (
             jnp.array(availability.get_weekly_shift_coverage(week)).astype(int)
             - off_cov
-            - available_cov
+            - avail_cov
         )
         shift_avail = availability.get_weekly_shifts(week)
 
@@ -247,32 +271,38 @@ class SchedulesGenerator(Generator):
 
         for pattern in possible_patterns:
             if not self._valid_consecutive_working_days(
-                agent.consec_work_carry + pattern.opening
+                max(agent.consec_work_carry, 0) + pattern.opening
             ):
                 continue
-            if opening_next_week:
-                if not self._valid_consecutive_working_days(
-                    pattern.closing + opening_next_week
-                ):
-                    continue
+            if opening_next_week and not self._valid_consecutive_working_days(
+                pattern.closing + opening_next_week
+            ):
+                continue
             if not self._valid_agent_start_times(agent, pattern):
                 continue
 
             if not self._valid_off_pattern(off_cov, shift_cov, pattern):
                 continue
 
+            if not self._valid_consistency(agent, pattern):
+                continue
+
+            if not self._valid_availability_consistency(shift_avail, pattern):
+                continue
+
             valid_poss.append(pattern)
 
-        return None
+        return tuple(valid_poss)
 
-    #####################################------------------------
-    # validations
-    def _valid_consecutive_working_days(self, consec_working_days: 6) -> bool:
-        return (
-            self.params.min_consecutive_working_days
-            <= consec_working_days
-            <= self.params.max_consecutive_working_days
-        )
+    def _valid_consecutive_working_days(self, consec_working_days: int) -> bool:
+        if consec_working_days == 0:
+            return True
+        else:
+            return (
+                self.params.min_consecutive_working_days
+                <= consec_working_days
+                <= self.params.max_consecutive_working_days
+            )
 
     def _valid_agent_start_times(
         self, agent: SchedulesAgent, pattern: SchedulesWeeklyPattern
@@ -308,13 +338,66 @@ class SchedulesGenerator(Generator):
     def _valid_consistency(
         self,
         agent: SchedulesAgent,
-        shift_avail: List[SchedulesShift],
         pattern: SchedulesWeeklyPattern,
     ) -> bool:
+        carry = agent.consec_work_carry
+        agent_consist_start = agent.consistency_start_time
+        pattern_consist_start = pattern.get_shift_at(0).start_time
+        params = self.params
+        if carry < -1:
+            return True
+        elif carry == -1:
+            return (
+                abs(pattern_consist_start - agent_consist_start)
+                <= params.multi_day_off_start_time_max_variance
+            )
+        elif carry == 0:
+            return (
+                abs(pattern_consist_start - agent_consist_start)
+                <= params.single_day_off_start_time_max_variance
+            )
+        else:
+            return agent_consist_start == pattern_consist_start
+
+    def _valid_availability_consistency(
+        self, shift_avail: List[SchedulesShift], pattern: SchedulesWeeklyPattern
+    ) -> bool:
+        for day in range(7):
+            avail_shift = shift_avail[day]
+            pattern_shift = pattern.get_shift_at(day)
+            # Check work day availability (keep starting time)
+            if (
+                avail_shift.is_work()
+                and avail_shift.start_time != pattern_shift.start_time
+            ):
+                return False
+            # Check unavailability start range
+            elif avail_shift.id == "unavailable" and (
+                avail_shift.start_time
+                < pattern_shift.start_time
+                < avail_shift.start_time + avail_shift.duration
+            ):
+                return False
+            # Check availability start range
+            elif avail_shift.id == "available" and not (
+                avail_shift.start_time
+                <= pattern_shift.start_time
+                <= avail_shift.start_time + avail_shift.duration
+            ):
+                return False
+
         return True
 
     def _validate_num_weeks(self, num_weeks: int) -> bool:
         return all([self.requirements.values.shape[1] >= num_weeks * 7])
+
+    def _get_full_schedules_weekly_coverage(self, week):
+        return sum(
+            [
+                schedule.get_multi_shift_weekly_coverage(0, self.requirement_shifts)
+                for schedule in self.schedules
+            ]
+        )
 
     @staticmethod
     def setup_schedules(
@@ -342,3 +425,7 @@ class SchedulesGenerator(Generator):
     @property
     def num_shifts(self) -> int:
         return len(self.requirements.shifts)
+
+    @property
+    def requirement_shifts(self) -> Tuple[SchedulesShift]:
+        return tuple(self.requirements.shifts)

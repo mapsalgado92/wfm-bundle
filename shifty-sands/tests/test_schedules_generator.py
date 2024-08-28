@@ -23,11 +23,10 @@ def local_test_objects():
     local_objects = TestObjects()
 
     db_shifts = [
-        Shift(id="A", start_time=9.0, duration=9.0, task="chat"),
-        Shift(id="B", start_time=12.0, duration=9.0, task="chat"),
-        Shift(id="C", start_time=16.0, duration=9.0, task="chat"),
-        Shift(id="D", start_time=23.0, duration=9.0, task="chat"),
-        Shift(id="E", start_time=9.0, duration=9.0, task="phone"),
+        Shift(id="A", start_time=9.0, duration=9.0, task="task1"),
+        Shift(id="B", start_time=12.0, duration=9.0, task="task1"),
+        Shift(id="C", start_time=16.0, duration=9.0, task="task1"),
+        Shift(id="D", start_time=23.0, duration=9.0, task="task1"),
     ]
 
     req_shifts = [RequirementShift(s) for s in db_shifts]
@@ -43,7 +42,6 @@ def local_test_objects():
             [4, 3, 3, 3, 3, 2, 2, 4, 3, 3, 3, 3, 2, 2],
             [2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # unused
-            [2, 2, 2, 2, 2, 0, 0, 2, 2, 2, 2, 2, 0, 0],  # non-base
         ]
     )
 
@@ -59,7 +57,7 @@ def local_test_objects():
             SchedulesAgent("A2", tasks=["task1", "task2"]),
             SchedulesAgent("A3", tasks=["task1", "task2"]),
             SchedulesAgent("A4", tasks=["task1", "task2"]),
-            SchedulesAgent("A5", tasks=["task1"]),
+            SchedulesAgent("A5", tasks=["task1", "task2"]),
             SchedulesAgent("A6", tasks=["task1"]),
             SchedulesAgent("A7", tasks=["task1"]),
             SchedulesAgent("A8", tasks=["task1"]),
@@ -68,13 +66,17 @@ def local_test_objects():
 
     vac = SchedulesShift.new_all_day_shift(id="vac", task="vac", type="pto")
     off = SchedulesShift.new_off_shift()
+    unav_16 = SchedulesShift.new_unavailable_shift(0, 16)
+    task2_9 = SchedulesShift.new_work_shift("Z", 9.0, 9.0, "task2")
+    task1_12 = sched_shifts[1]
 
     local_objects.add_object(
         "availability_dict",
         {
-            "A1": [None, None, None, vac, vac, off, off],
-            "A2": [None, None, None, None, None, off, off],
-            "A5": [None, None, None, off, None, None, None],
+            "A1": [None, None, unav_16, vac, vac, off, off],
+            "A2": [task1_12, None, None, None, None, off, off],
+            "A3": [off, off, None, None, None, None, None],
+            "A5": [None, None, task2_9, off, None, None, None],
             "A8": [vac, vac, off, off, None, None, None],
         },
     )
@@ -162,3 +164,48 @@ def test_generate_weekly_schedules(local_test_objects: TestObjects):
     sched_gen.generate(num_weeks=1)
 
     assert True
+
+
+def test_possible_patterns_validations(local_test_objects: TestObjects):
+    sched_reqs = local_test_objects.get_object("sched_reqs")
+    agents = local_test_objects.get_object("agents")
+    availability = local_test_objects.get_object("availability_dict")
+    schedules = SchedulesGenerator.setup_schedules(agents, availability)
+
+    sched_gen = SchedulesGenerator(requirements=sched_reqs, schedules=schedules)
+    poss_paterns = sched_gen._generate_possible_patterns()
+
+    # Agent with unavailable (0.0-16.0) foreced off and vacation (single pattern)
+    valid_poss_A1 = sched_gen._valid_weekly_possibilities(
+        week=0, sched_idx=0, possible_patterns=poss_paterns
+    )
+
+    # Agent with fixed days off, and a fixed working shift (one possible solution)
+    valid_poss_A2 = sched_gen._valid_weekly_possibilities(
+        week=0, sched_idx=1, possible_patterns=poss_paterns
+    )
+
+    # Agent with forced special task shift and forced off 9.0
+    valid_poss_A5 = sched_gen._valid_weekly_possibilities(
+        week=0, sched_idx=4, possible_patterns=poss_paterns
+    )
+
+    # Agent with no restrictions (only fact that carry is 0 excludes some possibilities)
+    valid_poss_A7 = sched_gen._valid_weekly_possibilities(
+        week=0, sched_idx=6, possible_patterns=poss_paterns
+    )
+
+    # Agent both forced off and vacation
+    valid_poss_A8 = sched_gen._valid_weekly_possibilities(
+        week=0, sched_idx=7, possible_patterns=poss_paterns
+    )
+
+    assert len(valid_poss_A1) == 2
+
+    assert len(valid_poss_A2) == 1 and valid_poss_A2[0].earliest_start == 12.0
+
+    assert len(valid_poss_A5) == 9
+
+    assert len(valid_poss_A7) == sum([poss.opening != 1 for poss in poss_paterns])
+
+    assert len(valid_poss_A8) == 12

@@ -19,8 +19,8 @@ class SchedulesAgent:
         id: str,
         tasks: List[str],
         constraints: AgentConstraints = AgentConstraints(),
-        consec_work_carry: int = 0.0,
-        consistency_start_time: float = 0.0,
+        consec_work_carry: int = -1,
+        consistency_start_time: float = 12.0,
     ) -> None:
         self.id = id
         self.tasks = tasks
