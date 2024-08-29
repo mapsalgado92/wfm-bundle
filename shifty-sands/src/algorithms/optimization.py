@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 from jax import jit, grad, random
-from .params import GradientDescentParams, StochasticRoundingParams
+from params import GradientDescentParams, StochasticRoundingParams
 from typing import Callable, Tuple
 
 

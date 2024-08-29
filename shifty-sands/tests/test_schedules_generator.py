@@ -3,8 +3,6 @@ from src.generators.schedules_generator import (
     SchedulesGenerator,
     SchedulesRequirement,
     SchedulesAgent,
-    SchedGeneratorParams,
-    Schedules,
 )
 
 from src.entities.shifts import RequirementShift, SchedulesShift, WeeklyShiftSequence
@@ -45,9 +43,8 @@ def local_test_objects():
         ]
     )
 
-    sched_reqs = SchedulesRequirement()
-    sched_reqs.shifts = req_shifts  # Shifts Tuple
-    sched_reqs.values = values  # Requirement Values
+    sched_reqs = SchedulesRequirement(tuple(req_shifts), values)
+
     local_objects.add_object("sched_reqs", sched_reqs)
 
     local_objects.add_object(
@@ -133,15 +130,15 @@ def test_generate_possible_patterns_output_is_correct(
     sched_gen = SchedulesGenerator(requirements=sched_reqs, schedules=schedules)
 
     sched_gen.params.days_off_to_break_consistency = 3
-    possible_patterns = sched_gen._generate_possible_patterns()
+    possible_patterns = sched_gen.generate_possible_patterns()
     possible_patterns_first_run = len(possible_patterns)
 
     sched_gen.params.days_off_to_break_consistency = 2
-    possible_patterns = sched_gen._generate_possible_patterns()
+    possible_patterns = sched_gen.generate_possible_patterns()
     possible_patterns_second_run = len(possible_patterns)
 
     sched_gen.params.days_off_to_break_consistency = 1
-    possible_patterns = sched_gen._generate_possible_patterns()
+    possible_patterns = sched_gen.generate_possible_patterns()
     possible_patterns_third_run = len(possible_patterns)
 
     assert (
@@ -161,7 +158,7 @@ def test_generate_weekly_schedules(local_test_objects: TestObjects):
     schedules = SchedulesGenerator.setup_schedules(agents, availability)
 
     sched_gen = SchedulesGenerator(requirements=sched_reqs, schedules=schedules)
-    sched_gen.generate(num_weeks=1)
+    sched_gen.generate(1)
 
     assert True
 
@@ -173,30 +170,30 @@ def test_possible_patterns_validations(local_test_objects: TestObjects):
     schedules = SchedulesGenerator.setup_schedules(agents, availability)
 
     sched_gen = SchedulesGenerator(requirements=sched_reqs, schedules=schedules)
-    poss_paterns = sched_gen._generate_possible_patterns()
+    poss_paterns = sched_gen.generate_possible_patterns()
 
     # Agent with unavailable (0.0-16.0) foreced off and vacation (single pattern)
-    valid_poss_A1 = sched_gen._valid_weekly_possibilities(
+    valid_poss_A1 = sched_gen._generate_valid_weekly_patterns(
         week=0, sched_idx=0, possible_patterns=poss_paterns
     )
 
     # Agent with fixed days off, and a fixed working shift (one possible solution)
-    valid_poss_A2 = sched_gen._valid_weekly_possibilities(
+    valid_poss_A2 = sched_gen._generate_valid_weekly_patterns(
         week=0, sched_idx=1, possible_patterns=poss_paterns
     )
 
     # Agent with forced special task shift and forced off 9.0
-    valid_poss_A5 = sched_gen._valid_weekly_possibilities(
+    valid_poss_A5 = sched_gen._generate_valid_weekly_patterns(
         week=0, sched_idx=4, possible_patterns=poss_paterns
     )
 
     # Agent with no restrictions (only fact that carry is 0 excludes some possibilities)
-    valid_poss_A7 = sched_gen._valid_weekly_possibilities(
+    valid_poss_A7 = sched_gen._generate_valid_weekly_patterns(
         week=0, sched_idx=6, possible_patterns=poss_paterns
     )
 
     # Agent both forced off and vacation
-    valid_poss_A8 = sched_gen._valid_weekly_possibilities(
+    valid_poss_A8 = sched_gen._generate_valid_weekly_patterns(
         week=0, sched_idx=7, possible_patterns=poss_paterns
     )
 
@@ -209,3 +206,18 @@ def test_possible_patterns_validations(local_test_objects: TestObjects):
     assert len(valid_poss_A7) == sum([poss.opening != 1 for poss in poss_paterns])
 
     assert len(valid_poss_A8) == 12
+
+
+def test_overconstrained_output_when_no_valid_patterns(
+    local_test_objects: TestObjects,
+) -> None:
+    sched_reqs = local_test_objects.get_object("sched_reqs")
+    agents = local_test_objects.get_object("agents")
+    availability = local_test_objects.get_object("availability_dict")
+    for key, value in availability.items():
+        availability[key] = [*value, *[None, None, None, None, None, None, None]]
+    schedules = SchedulesGenerator.setup_schedules(agents, availability, num_weeks=2)
+    sched_gen = SchedulesGenerator(requirements=sched_reqs, schedules=schedules)
+    sched_gen.generate(2)
+
+    assert True

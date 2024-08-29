@@ -38,8 +38,11 @@ class SchedulesWeeklyPattern(WeeklyPattern):
         )
         self.shift_list = shift_list
 
-    def get_shift_at(self, day: int):
+    def get_shift_at(self, day: int) -> SchedulesShift:
         return self.shift_list[day]
+
+    def get_shift_coverage(self, shift: SchedulesShift) -> List[bool]:
+        return [shift.id == sched_shift.id for sched_shift in self.shift_list]
 
     @property
     def num_work_shifts(self) -> int:

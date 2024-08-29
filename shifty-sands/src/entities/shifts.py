@@ -75,7 +75,7 @@ class SchedulesShift(Shift):
         return self.type == "off"
 
     def is_avail(self):
-        return self.type == "off"
+        return self.type == "avail"
 
     # alternative initializers
     @staticmethod
@@ -132,12 +132,14 @@ class SchedulesShift(Shift):
 
 
 class WeeklyShiftSequence:
-    def __init__(self, num_weeks: int, default_shift: Shift):
+    def __init__(self, num_weeks: int, default_shift: SchedulesShift):
         self.num_weeks: int = num_weeks
-        self.default_shift: Shift = default_shift
-        self.shifts: List[Shift] = [default_shift for _ in range(num_weeks * 7)]
+        self.default_shift: SchedulesShift = default_shift
+        self.shifts: List[SchedulesShift] = [
+            default_shift for _ in range(num_weeks * 7)
+        ]
 
-    def get_weekly_shifts(self, week: int) -> List[Shift]:
+    def get_weekly_shifts(self, week: int) -> List[SchedulesShift]:
         """
         Get sub-list of shifts for a given week.
         Weeks are index like, starting at 0 and ending in self.num_weeks
@@ -156,7 +158,7 @@ class WeeklyShiftSequence:
         """
         self.check_week(week)
 
-        def check_shift(shift: Optional[Shift]):
+        def check_shift(shift: Optional[SchedulesShift]):
             if shift == None:
                 return False
             elif shift_ids != None:
@@ -166,11 +168,15 @@ class WeeklyShiftSequence:
 
         return [check_shift(shift) for shift in self.get_weekly_shifts(week)]
 
-    def set_weekly_shifts(self, shifts: List[Shift], week: int) -> None:
+    def set_weekly_shifts(self, shifts: List[SchedulesShift], week: int) -> None:
         self.check_week(week)
         self.shifts[week * 7 : (week + 1) * 7] = shifts
 
-    def set_daily_shift(self, shift: Shift, day: int) -> None:
+    def reset_weekly_shifts(self, week: int) -> None:
+        self.check_week(week)
+        self.shifts[week * 7 : (week + 1) * 7] = [self.default_shift for _ in range(7)]
+
+    def set_daily_shift(self, shift: SchedulesShift, day: int) -> None:
         """
         Day is an index, being 0 the first day and the last self.num_weeks * 7 - 1"
         """
@@ -186,7 +192,7 @@ class WeeklyShiftSequence:
 
     @staticmethod
     def from_list(
-        shift_list: List[Optional[Shift]], default_shift: Shift
+        shift_list: List[Optional[SchedulesShift]], default_shift: SchedulesShift
     ) -> "WeeklyShiftSequence":
         num_weeks = len(shift_list) / 7
         if round(num_weeks) != num_weeks:
